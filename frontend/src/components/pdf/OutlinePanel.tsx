@@ -8,17 +8,17 @@ export interface OutlineItem {
   id: string;
   title: string;
   pageNumber: number;
-  level: number;
 }
 
 export const DOCUMENT_OUTLINE: OutlineItem[] = [
-  { id: "sec-1", title: "1. Introduction", pageNumber: 1, level: 1 },
-  { id: "sec-2", title: "2. Literature Review", pageNumber: 4, level: 1 },
-  { id: "sec-3", title: "3. Methodology & Architecture", pageNumber: 12, level: 1 },
-  { id: "sec-3-1", title: "3.1 Hybrid Vector Search", pageNumber: 14, level: 2 },
-  { id: "sec-4", title: "4. Experimental Results", pageNumber: 16, level: 1 },
-  { id: "sec-5", title: "5. Discussion & Benchmarks", pageNumber: 20, level: 1 },
-  { id: "sec-6", title: "6. Conclusion & Future Work", pageNumber: 24, level: 1 },
+  { id: "sec-1", title: "1. Abstract", pageNumber: 1 },
+  { id: "sec-2", title: "2. Introduction", pageNumber: 2 },
+  { id: "sec-3", title: "3. Literature Review", pageNumber: 4 },
+  { id: "sec-4", title: "4. Methodology", pageNumber: 7 },
+  { id: "sec-5", title: "5. Experiments", pageNumber: 11 },
+  { id: "sec-6", title: "6. Results", pageNumber: 13 },
+  { id: "sec-7", title: "7. Discussion", pageNumber: 15 },
+  { id: "sec-8", title: "8. Conclusion", pageNumber: 18 },
 ];
 
 interface OutlinePanelProps {
@@ -29,6 +29,7 @@ interface OutlinePanelProps {
 export function OutlinePanel({ activePage, onSelectSection }: OutlinePanelProps) {
   return (
     <div className="space-y-4 p-4 select-none">
+      {/* Header */}
       <div className="flex items-center justify-between border-b border-border/60 pb-3">
         <div className="flex items-center gap-2">
           <ListTree className="h-4 w-4 text-primary" />
@@ -41,6 +42,7 @@ export function OutlinePanel({ activePage, onSelectSection }: OutlinePanelProps)
         </Badge>
       </div>
 
+      {/* Sections List */}
       <div className="space-y-1.5">
         {DOCUMENT_OUTLINE.map((item) => {
           const isActive = activePage === item.pageNumber;
@@ -52,7 +54,7 @@ export function OutlinePanel({ activePage, onSelectSection }: OutlinePanelProps)
                 isActive
                   ? "bg-primary/10 border-primary/40 text-primary font-bold shadow-xs"
                   : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              } ${item.level === 2 ? "ml-3 w-[calc(100%-0.75rem)]" : ""}`}
+              }`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <ChevronRight className={`h-3.5 w-3.5 shrink-0 ${isActive ? "text-primary" : "text-muted-foreground"}`} />

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FileText, ArrowRight, Bookmark } from "lucide-react";
+import { FileText, ArrowRight, Bookmark, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 
@@ -48,9 +48,19 @@ export function CitationCard({
         </Badge>
       </div>
 
-      <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-        <Bookmark className="h-3.5 w-3.5 text-primary" />
-        <span>Page {citation.pageNumber}</span>
+      <div className="flex items-center justify-between text-xs font-bold text-foreground">
+        <div className="flex items-center gap-1.5">
+          <Bookmark className="h-3.5 w-3.5 text-primary" />
+          <span>Page {citation.pageNumber}</span>
+        </div>
+
+        <Badge
+          variant="secondary"
+          className="gap-1 text-[9px] py-0 px-1.5 bg-primary/10 text-primary border-primary/20 font-bold"
+        >
+          <Layers className="h-2.5 w-2.5" />
+          <span>Bounding Box Ready</span>
+        </Badge>
       </div>
 
       <p className="text-xs text-muted-foreground italic leading-relaxed bg-muted/40 p-2.5 rounded-lg border border-border/40">
@@ -62,7 +72,7 @@ export function CitationCard({
         onClick={() => onGoToHighlight(citation.pageNumber)}
         className="w-full h-8 text-xs gap-1.5 font-semibold shadow-xs"
       >
-        <span>Go to Highlight</span>
+        <span>Jump To Citation</span>
         <ArrowRight className="h-3.5 w-3.5" />
       </Button>
     </div>

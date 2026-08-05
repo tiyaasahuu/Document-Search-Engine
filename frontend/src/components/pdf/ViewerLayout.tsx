@@ -81,14 +81,14 @@ export function ViewerLayout() {
         lastModified="2 hours ago"
       />
 
-      {/* Main 65/35 Split Workspace */}
+      {/* Main 70/30 Split Workspace */}
       <div
         className={`flex flex-col lg:flex-row h-[calc(100vh-13rem)] rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xl ${
           isFullscreen ? "fixed inset-0 z-50 rounded-none border-none h-screen" : ""
         }`}
       >
-        {/* LEFT COLUMN (65%): PDF Reader Toolbar & Canvas */}
-        <div className="flex-1 lg:w-[65%] flex flex-col min-w-0 h-full border-b lg:border-b-0 lg:border-r border-border/60">
+        {/* LEFT COLUMN (70%): PDF Reader Toolbar & Canvas */}
+        <div className="flex-1 lg:w-[70%] flex flex-col min-w-0 h-full border-b lg:border-b-0 lg:border-r border-border/60">
           {/* PDF Toolbar */}
           <PDFToolbar
             currentPage={currentPage}
@@ -121,8 +121,8 @@ export function ViewerLayout() {
           )}
         </div>
 
-        {/* RIGHT COLUMN (35%): AI Assistant Panel with Tabs */}
-        <div className="hidden lg:flex w-full lg:w-[35%] shrink-0 flex-col h-full bg-card/60">
+        {/* RIGHT COLUMN (30%): AI Workspace Panel with Tabs */}
+        <div className="hidden lg:flex w-full lg:w-[30%] shrink-0 flex-col h-full bg-card/60">
           <Tabs
             value={activeTab}
             onValueChange={setActiveTab}
@@ -143,7 +143,7 @@ export function ViewerLayout() {
 
                 <TabsTrigger value="info" className="text-xs gap-1.5 font-semibold">
                   <Info className="h-3.5 w-3.5" />
-                  <span>Document Info</span>
+                  <span>Doc Info</span>
                 </TabsTrigger>
               </TabsList>
             </div>
