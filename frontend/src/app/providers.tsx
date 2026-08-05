@@ -4,6 +4,7 @@ import React from "react";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { QueryProvider } from "@/providers/query-provider";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "@/components/ui/sonner";
 
 export function AppProviders({ children }: { children: React.ReactNode }) {
   return (
@@ -14,7 +15,10 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       disableTransitionOnChange
     >
       <QueryProvider>
-        <TooltipProvider>{children}</TooltipProvider>
+        <TooltipProvider>
+          {children}
+          <Toaster position="top-right" richColors />
+        </TooltipProvider>
       </QueryProvider>
     </ThemeProvider>
   );
