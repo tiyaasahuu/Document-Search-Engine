@@ -1,0 +1,38 @@
+from typing import List, TYPE_CHECKING
+import uuid
+from datetime import datetime
+from sqlalchemy import BigInteger, DateTime, String, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.base import Base
+
+if TYPE_CHECKING:
+    from app.models.document_page import DocumentPage
+    from app.models.document_chunk import DocumentChunk
+
+
+class Document(Base):
+    __tablename__ = "documents"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    filename: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    file_size: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    upload_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(50), default="Uploaded", nullable=False)
+    file_path: Mapped[str] = mapped_column(String(512), nullable=False)
+
+    pages: Mapped[List["DocumentPage"]] = relationship(
+        "DocumentPage", back_populates="document", cascade="all, delete-orphan"
+    )
+    chunks: Mapped[List["DocumentChunk"]] = relationship(
+        "DocumentChunk", back_populates="document", cascade="all, delete-orphan"
+    )
+
+
