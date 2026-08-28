@@ -10,7 +10,8 @@ python-multipart>=0.0.9
 PyMuPDF>=1.23.0
 pytesseract>=0.3.10
 Pillow>=10.0.0
-pgvector>=0.2.5
+sentence-transformers>=2.5.0
+pytest>=8.0.0
 
 
 

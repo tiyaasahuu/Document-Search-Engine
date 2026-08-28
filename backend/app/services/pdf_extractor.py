@@ -9,6 +9,7 @@ from app.models.document import Document
 from app.models.document_page import DocumentPage
 from app.services.ocr_service import OCRService
 from app.services.chunking_service import ChunkingService
+from app.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,10 @@ class PDFExtractorService:
             # Step 3: Trigger text chunking service
             chunks = ChunkingService.process_document_chunking(db, document.id)
             logger.info(f"Successfully chunked document {document.id} into {len(chunks)} text chunks.")
+
+            # Step 4: Trigger embedding generation service
+            chunks = EmbeddingService.process_chunks_embeddings(db, chunks)
+            logger.info(f"Successfully generated embeddings for {len(chunks)} chunks of document {document.id}.")
 
             return True
 
