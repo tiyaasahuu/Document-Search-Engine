@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
 import {
   FileText,
@@ -38,13 +39,17 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Search className="w-4 h-4" />
-              <span>Search Knowledge</span>
+            <Button variant="outline" size="sm" className="gap-2" asChild>
+              <Link href="/search">
+                <Search className="w-4 h-4" />
+                <span>Search Knowledge</span>
+              </Link>
             </Button>
-            <Button size="sm" className="gap-2 shadow-xs">
-              <FileText className="w-4 h-4" />
-              <span>Upload Document</span>
+            <Button size="sm" className="gap-2 shadow-xs" asChild>
+              <Link href="/upload">
+                <FileText className="w-4 h-4" />
+                <span>Upload Document</span>
+              </Link>
             </Button>
           </div>
         </div>
@@ -115,56 +120,62 @@ export default function DashboardPage() {
 
         {/* Feature Cards Showcase */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-          <Card className="group border-border/60 shadow-xs hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
-            <CardHeader>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <FileText className="h-5 w-5" />
-              </div>
-              <CardTitle className="text-lg">Document Vault</CardTitle>
-              <CardDescription>
-                Store, parse, and structure research papers, PDFs, and legal briefs.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
-                Explore Documents <ArrowUpRight className="h-3 w-3" />
-              </div>
-            </CardContent>
-          </Card>
+          <Link href="/documents" className="block text-inherit no-underline">
+            <Card className="group border-border/60 shadow-xs hover:shadow-md hover:border-primary/50 transition-all cursor-pointer h-full">
+              <CardHeader>
+                <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg">Document Vault</CardTitle>
+                <CardDescription>
+                  Store, parse, and structure research papers, PDFs, and legal briefs.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
+                  Explore Documents <ArrowUpRight className="h-3 w-3" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="group border-border/60 shadow-xs hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
-            <CardHeader>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <MessageSquareText className="h-5 w-5" />
-              </div>
-              <CardTitle className="text-lg">Interactive AI Chat</CardTitle>
-              <CardDescription>
-                Ask questions across multiple research documents simultaneously.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
-                Start Research Session <ArrowUpRight className="h-3 w-3" />
-              </div>
-            </CardContent>
-          </Card>
+          <Link href="/chat" className="block text-inherit no-underline">
+            <Card className="group border-border/60 shadow-xs hover:shadow-md hover:border-primary/50 transition-all cursor-pointer h-full">
+              <CardHeader>
+                <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <MessageSquareText className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg">Interactive AI Chat</CardTitle>
+                <CardDescription>
+                  Ask questions across multiple research documents simultaneously.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
+                  Start Research Session <ArrowUpRight className="h-3 w-3" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="group border-border/60 shadow-xs hover:shadow-md hover:border-primary/50 transition-all cursor-pointer">
-            <CardHeader>
-              <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
-                <Search className="h-5 w-5" />
-              </div>
-              <CardTitle className="text-lg">Hybrid Search Engine</CardTitle>
-              <CardDescription>
-                Perform semantic vector searches with instant citation references.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
-                Query Engine <ArrowUpRight className="h-3 w-3" />
-              </div>
-            </CardContent>
-          </Card>
+          <Link href="/search" className="block text-inherit no-underline">
+            <Card className="group border-border/60 shadow-xs hover:shadow-md hover:border-primary/50 transition-all cursor-pointer h-full">
+              <CardHeader>
+                <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                  <Search className="h-5 w-5" />
+                </div>
+                <CardTitle className="text-lg">Hybrid Search Engine</CardTitle>
+                <CardDescription>
+                  Perform semantic vector searches with instant citation references.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-xs text-primary font-medium flex items-center gap-1 group-hover:underline">
+                  Query Engine <ArrowUpRight className="h-3 w-3" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
         </div>
       </div>
     </AppLayout>

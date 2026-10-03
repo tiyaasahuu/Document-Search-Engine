@@ -2,9 +2,20 @@ import React from "react";
 import { FileText, CheckCircle2, Sparkles, Sidebar, PanelRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { DocumentResponse } from "@/types";
 
 interface ChatHeaderProps {
-  currentDocument: string;
+  currentDocument?: string;
+  documents?: DocumentResponse[];
+  selectedDocId?: string;
+  onSelectDocId?: (docId: string) => void;
   onToggleMobileHistory?: () => void;
   onToggleCitations?: () => void;
   isCitationsOpen?: boolean;
@@ -12,6 +23,9 @@ interface ChatHeaderProps {
 
 export function ChatHeader({
   currentDocument,
+  documents = [],
+  selectedDocId = "all",
+  onSelectDocId,
   onToggleMobileHistory,
   onToggleCitations,
   isCitationsOpen,
@@ -37,22 +51,34 @@ export function ChatHeader({
             <FileText className="h-4 w-4" />
           </div>
 
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {onSelectDocId ? (
+              <Select value={selectedDocId} onValueChange={onSelectDocId}>
+                <SelectTrigger className="h-8 text-xs font-semibold max-w-[200px] sm:max-w-xs bg-background">
+                  <SelectValue placeholder="All Documents" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Documents</SelectItem>
+                  {documents.map((doc) => (
+                    <SelectItem key={doc.id} value={doc.id}>
+                      {doc.original_filename}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
               <span className="text-xs font-bold text-foreground truncate max-w-[160px] sm:max-w-xs">
-                {currentDocument}
+                {currentDocument || "All Documents"}
               </span>
-              <Badge
-                variant="outline"
-                className="gap-1 text-[10px] py-0 px-1.5 bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-semibold shrink-0"
-              >
-                <CheckCircle2 className="h-3 w-3" />
-                <span>Indexed</span>
-              </Badge>
-            </div>
-            <span className="text-[10px] text-muted-foreground hidden sm:block">
-              Vector index active • 1,420 chunks
-            </span>
+            )}
+
+            <Badge
+              variant="outline"
+              className="gap-1 text-[10px] py-0 px-1.5 bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-semibold shrink-0 hidden sm:inline-flex"
+            >
+              <CheckCircle2 className="h-3 w-3" />
+              <span>RAG Active</span>
+            </Badge>
           </div>
         </div>
       </div>

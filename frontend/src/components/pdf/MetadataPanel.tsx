@@ -3,20 +3,35 @@
 import React from "react";
 import {
   FileText,
-  User,
   Calendar,
   HardDrive,
-  Globe,
   BookOpen,
   CheckCircle2,
-  Cpu,
   Database,
-  Clock,
-  FileCheck,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { DocumentResponse } from "@/types";
 
-export function MetadataPanel() {
+interface MetadataPanelProps {
+  document?: DocumentResponse | null;
+}
+
+export function MetadataPanel({ document }: MetadataPanelProps) {
+  const formatSize = (bytes?: number) => {
+    if (!bytes) return "Unknown";
+    const mb = bytes / (1024 * 1024);
+    return mb < 1 ? `${(bytes / 1024).toFixed(1)} KB` : `${mb.toFixed(1)} MB`;
+  };
+
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "N/A";
+    return new Date(dateStr).toLocaleDateString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   return (
     <div className="space-y-4 p-4 select-none">
       <div className="flex items-center justify-between border-b border-border/60 pb-3">
@@ -27,7 +42,7 @@ export function MetadataPanel() {
           </h3>
         </div>
         <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/5">
-          Research Paper
+          {document?.mime_type || "PDF Document"}
         </Badge>
       </div>
 
@@ -36,8 +51,8 @@ export function MetadataPanel() {
           <span className="text-muted-foreground flex items-center gap-2">
             <FileText className="h-3.5 w-3.5 text-primary" /> Filename
           </span>
-          <span className="font-bold text-foreground truncate max-w-[180px]">
-            Research_Paper_AI.pdf
+          <span className="font-bold text-foreground truncate max-w-[180px]" title={document?.original_filename || "N/A"}>
+            {document?.original_filename || "N/A"}
           </span>
         </div>
 
@@ -45,52 +60,29 @@ export function MetadataPanel() {
           <span className="text-muted-foreground flex items-center gap-2">
             <BookOpen className="h-3.5 w-3.5 text-primary" /> Pages
           </span>
-          <span className="font-bold text-foreground">18 Pages</span>
-        </div>
-
-        <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
-          <span className="text-muted-foreground flex items-center gap-2">
-            <User className="h-3.5 w-3.5 text-primary" /> Author
-          </span>
-          <span className="font-bold text-foreground">OpenAI Research Team</span>
-        </div>
-
-        <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
-          <span className="text-muted-foreground flex items-center gap-2">
-            <Globe className="h-3.5 w-3.5 text-primary" /> Language
-          </span>
-          <span className="font-bold text-foreground">English</span>
+          <span className="font-bold text-foreground">{document?.total_pages ?? "N/A"} Pages</span>
         </div>
 
         <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
           <span className="text-muted-foreground flex items-center gap-2">
             <Calendar className="h-3.5 w-3.5 text-primary" /> Upload Date
           </span>
-          <span className="font-bold text-foreground">Today</span>
+          <span className="font-bold text-foreground">{formatDate(document?.upload_time)}</span>
         </div>
 
         <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
           <span className="text-muted-foreground flex items-center gap-2">
             <HardDrive className="h-3.5 w-3.5 text-primary" /> File Size
           </span>
-          <span className="font-bold text-foreground">2.8 MB</span>
+          <span className="font-bold text-foreground">{formatSize(document?.file_size)}</span>
         </div>
 
         <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
           <span className="text-muted-foreground flex items-center gap-2">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> OCR Status
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Processing Status
           </span>
           <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold text-[10px]">
-            Completed
-          </Badge>
-        </div>
-
-        <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
-          <span className="text-muted-foreground flex items-center gap-2">
-            <Cpu className="h-3.5 w-3.5 text-primary" /> Embedding Status
-          </span>
-          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20 font-bold text-[10px]">
-            Completed
+            {document?.status || "Processed"}
           </Badge>
         </div>
 
@@ -99,22 +91,8 @@ export function MetadataPanel() {
             <Database className="h-3.5 w-3.5 text-primary" /> Vector Database
           </span>
           <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 font-bold text-[10px]">
-            Indexed
+            pgvector
           </Badge>
-        </div>
-
-        <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
-          <span className="text-muted-foreground flex items-center gap-2">
-            <FileCheck className="h-3.5 w-3.5 text-primary" /> Document Type
-          </span>
-          <span className="font-bold text-foreground">Research Paper</span>
-        </div>
-
-        <div className="flex items-center justify-between p-2.5 rounded-xl border border-border/60 bg-muted/30">
-          <span className="text-muted-foreground flex items-center gap-2">
-            <Clock className="h-3.5 w-3.5 text-primary" /> Reading Time
-          </span>
-          <span className="font-bold text-foreground">12 minutes</span>
         </div>
       </div>
     </div>

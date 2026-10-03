@@ -1,7 +1,7 @@
 from typing import List, TYPE_CHECKING
 import uuid
 from datetime import datetime
-from sqlalchemy import BigInteger, DateTime, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -10,6 +10,7 @@ from app.db.base import Base
 if TYPE_CHECKING:
     from app.models.document_page import DocumentPage
     from app.models.document_chunk import DocumentChunk
+    from app.models.user import User
 
 
 class Document(Base):
@@ -17,6 +18,9 @@ class Document(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     filename: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -28,6 +32,7 @@ class Document(Base):
     status: Mapped[str] = mapped_column(String(50), default="Uploaded", nullable=False)
     file_path: Mapped[str] = mapped_column(String(512), nullable=False)
 
+    user: Mapped["User"] = relationship("User", back_populates="documents")
     pages: Mapped[List["DocumentPage"]] = relationship(
         "DocumentPage", back_populates="document", cascade="all, delete-orphan"
     )

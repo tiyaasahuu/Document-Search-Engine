@@ -159,8 +159,15 @@ def test_full_document_upload_and_extraction_in_db():
         file_obj = BytesIO(pdf_bytes)
         upload_file = UploadFile(filename="mixed_test_document.pdf", file=file_obj)
 
+        from app.models.user import User
+        user = db.query(User).first()
+        if not user:
+            user = User(id=uuid.UUID("00000000-0000-0000-0000-000000000000"), email="pdf_test@example.com", hashed_password="pass", full_name="PDF User")
+            db.add(user)
+            db.commit()
+
         with patch.object(OCRService, "extract_text_from_page", return_value=("OCR text for page 2", "ocr")):
-            doc = DocumentService.save_uploaded_document(db, upload_file)
+            doc = DocumentService.save_uploaded_document(db, upload_file, user)
             assert doc is not None
             assert doc.status == "Processed"
 

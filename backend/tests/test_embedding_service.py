@@ -57,8 +57,16 @@ def test_embeddings_are_stored_in_postgresql(db: Session):
     doc_id = uuid.uuid4()
     page_id = uuid.uuid4()
 
+    from app.models.user import User
+    user = db.query(User).first()
+    if not user:
+        user = User(id=uuid.uuid4(), email=f"emb1_{uuid.uuid4().hex[:8]}@example.com", hashed_password="pass", full_name="Emb User 1")
+        db.add(user)
+        db.commit()
+
     doc = Document(
         id=doc_id,
+        user_id=user.id,
         filename=f"{doc_id}.pdf",
         original_filename="embedding_test.pdf",
         file_size=1024,
@@ -114,8 +122,16 @@ def test_existing_embeddings_are_not_unnecessarily_regenerated(db: Session, monk
 
     dummy_vec = [0.1] * 384
 
+    from app.models.user import User
+    user = db.query(User).first()
+    if not user:
+        user = User(id=uuid.uuid4(), email=f"emb2_{uuid.uuid4().hex[:8]}@example.com", hashed_password="pass", full_name="Emb User 2")
+        db.add(user)
+        db.commit()
+
     doc = Document(
         id=doc_id,
+        user_id=user.id,
         filename=f"{doc_id}.pdf",
         original_filename="idempotency_test.pdf",
         file_size=1024,
@@ -182,9 +198,17 @@ def test_end_to_end_pdf_upload_creates_chunks_with_embeddings(db: Session, tmp_p
     doc.save(pdf_path)
     doc.close()
 
+    from app.models.user import User
+    user = db.query(User).first()
+    if not user:
+        user = User(id=uuid.uuid4(), email=f"emb3_{uuid.uuid4().hex[:8]}@example.com", hashed_password="pass", full_name="Emb User 3")
+        db.add(user)
+        db.commit()
+
     doc_id = uuid.uuid4()
     document = Document(
         id=doc_id,
+        user_id=user.id,
         filename=f"{doc_id}.pdf",
         original_filename="sample_test.pdf",
         file_size=os.path.getsize(pdf_path),

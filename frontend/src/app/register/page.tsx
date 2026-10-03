@@ -3,23 +3,42 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Sparkles, ArrowLeft, Mail, Lock, User, UserPlus, CheckCircle2 } from "lucide-react";
+import { Sparkles, ArrowLeft, Mail, Lock, User, UserPlus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { siteConfig } from "@/config/site";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { useAuth } from "@/providers/auth-provider";
+import { toast } from "sonner";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { register } = useAuth();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate account creation & navigate to dashboard
-    router.push("/dashboard");
+    if (!email || !password) return;
+
+    setIsSubmitting(true);
+    try {
+      await register(name, email, password);
+      toast.success("Account created!", { description: "Welcome to your workspace." });
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      console.error("Registration failed:", err);
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+        "Failed to create account.";
+      toast.error("Registration Error", { description: msg });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -63,7 +82,7 @@ export default function RegisterPage() {
                     placeholder="Alex Morgan"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    required
+                    disabled={isSubmitting}
                     className="pl-9"
                   />
                 </div>
@@ -81,6 +100,7 @@ export default function RegisterPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="pl-9"
                   />
                 </div>
@@ -98,35 +118,21 @@ export default function RegisterPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    disabled={isSubmitting}
                     className="pl-9"
                   />
                 </div>
               </div>
 
-              <Button type="submit" className="w-full gap-2 shadow-xs">
-                <UserPlus className="w-4 h-4" />
+              <Button type="submit" disabled={isSubmitting} className="w-full gap-2 shadow-xs">
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <UserPlus className="w-4 h-4" />
+                )}
                 <span>Create Workspace Account</span>
               </Button>
             </form>
-
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or</span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => router.push("/dashboard")}
-              className="w-full gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-              <span>Explore Instant Demo Mode</span>
-            </Button>
           </CardContent>
 
           <CardFooter className="flex justify-center border-t border-border/40 pt-4 text-xs text-muted-foreground">

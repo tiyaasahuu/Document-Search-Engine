@@ -19,16 +19,23 @@ import { toast } from "sonner";
 interface ViewerHeaderProps {
   documentName?: string;
   lastModified?: string;
+  downloadUrl?: string | null;
   onGenerateSummary?: () => void;
 }
 
 export function ViewerHeader({
   documentName = "Research_Paper_AI.pdf",
-  lastModified = "2 hours ago",
+  lastModified = "Recently",
+  downloadUrl,
   onGenerateSummary,
 }: ViewerHeaderProps) {
   const handleDownload = () => {
-    toast.success(`Downloading "${documentName}"...`);
+    if (downloadUrl) {
+      window.open(downloadUrl, "_blank");
+      toast.success(`Downloading "${documentName}"...`);
+    } else {
+      toast.info(`Downloading "${documentName}"...`);
+    }
   };
 
   const handleShare = () => {

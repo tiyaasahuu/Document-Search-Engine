@@ -89,8 +89,16 @@ def test_chunk_data_preservation_with_nullable_embedding():
         doc_id = uuid.uuid4()
         page_id = uuid.uuid4()
 
+        from app.models.user import User
+        user = db.query(User).first()
+        if not user:
+            user = User(id=uuid.uuid4(), email=f"pgv_{uuid.uuid4().hex[:8]}@example.com", hashed_password="pass", full_name="PGV User")
+            db.add(user)
+            db.commit()
+
         document = Document(
             id=doc_id,
+            user_id=user.id,
             filename=f"{doc_id}.pdf",
             original_filename="pgvector_test_doc.pdf",
             file_size=512,

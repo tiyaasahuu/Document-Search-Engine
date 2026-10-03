@@ -1,91 +1,79 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UploadCloud, FolderKanban, FileSpreadsheet } from "lucide-react";
+import { UploadCloud, FolderKanban, FileSpreadsheet, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { DocumentFilterBar, StatusFilterOption, SortOption } from "@/components/documents/DocumentFilterBar";
 import { DocumentListTable } from "@/components/documents/DocumentListTable";
 import { DocumentPagination } from "@/components/documents/DocumentPagination";
 import { DocumentItem } from "@/components/upload/DocumentTable";
+import { documentService } from "@/services/documentService";
+import { DocumentResponse } from "@/types";
 
-const INITIAL_DOCUMENTS: DocumentItem[] = [
-  {
-    id: "doc-1",
-    name: "research_paper.pdf",
-    type: "pdf",
-    uploadDate: "Aug 05, 2026",
-    status: "Indexed",
-    pages: 32,
-    size: "4.8 MB",
-  },
-  {
-    id: "doc-2",
-    name: "contract.pdf",
-    type: "pdf",
-    uploadDate: "Aug 04, 2026",
-    status: "Indexed",
-    pages: 14,
-    size: "2.1 MB",
-  },
-  {
-    id: "doc-3",
-    name: "medical_report.pdf",
-    type: "pdf",
-    uploadDate: "Aug 03, 2026",
-    status: "Processing",
-    pages: 28,
-    size: "5.4 MB",
-  },
-  {
-    id: "doc-4",
-    name: "thesis.pdf",
-    type: "pdf",
-    uploadDate: "Aug 02, 2026",
-    status: "Indexed",
-    pages: 110,
-    size: "18.2 MB",
-  },
-  {
-    id: "doc-5",
-    name: "financial_audit_q3.docx",
-    type: "docx",
-    uploadDate: "Aug 01, 2026",
-    status: "Uploading",
-    pages: 8,
-    size: "1.2 MB",
-  },
-  {
-    id: "doc-6",
-    name: "corrupted_dataset.txt",
-    type: "txt",
-    uploadDate: "Jul 28, 2026",
-    status: "Failed",
-    pages: 0,
-    size: "0.2 MB",
-  },
-  {
-    id: "doc-7",
-    name: "deep_learning_survey.pdf",
-    type: "pdf",
-    uploadDate: "Jul 25, 2026",
-    status: "Indexed",
-    pages: 45,
-    size: "7.9 MB",
-  },
-];
+const ITEMS_PER_PAGE = 10;
 
-const ITEMS_PER_PAGE = 5;
+function mapResponseToItem(doc: DocumentResponse): DocumentItem {
+  const extension = doc.original_filename.split(".").pop()?.toLowerCase() || "pdf";
+  const sizeMB = (doc.file_size / (1024 * 1024)).toFixed(1);
+  const formattedDate = doc.upload_time
+    ? new Date(doc.upload_time).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Recently";
+
+  let statusVal: DocumentItem["status"] = "Processing";
+  if (doc.status === "Indexed" || doc.status === "Processed") {
+    statusVal = "Indexed";
+  } else if (doc.status === "Failed") {
+    statusVal = "Failed";
+  } else if (doc.status === "Uploaded") {
+    statusVal = "Uploaded";
+  }
+
+  return {
+    id: doc.id,
+    name: doc.original_filename,
+    type: extension,
+    uploadDate: formattedDate,
+    status: statusVal,
+    pages: 1,
+    size: `${sizeMB} MB`,
+  };
+}
 
 export default function MyDocumentsPage() {
-  const [documents, setDocuments] = useState<DocumentItem[]>(INITIAL_DOCUMENTS);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilterOption>("all");
   const [sortBy, setSortBy] = useState<SortOption>("newest");
   const [currentPage, setCurrentPage] = useState(1);
+
+  const fetchDocuments = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await documentService.getDocuments();
+      setDocuments(data.map(mapResponseToItem));
+    } catch (err: unknown) {
+      console.error("Failed to fetch documents:", err);
+      const errMsg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Could not connect to backend server.";
+      toast.error("Failed to fetch documents", {
+        description: errMsg,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
 
   // Search & Filter & Sort Logic
   const filteredAndSortedDocuments = useMemo(() => {
@@ -122,7 +110,7 @@ export default function MyDocumentsPage() {
   }, [documents, searchQuery, statusFilter, sortBy]);
 
   // Pagination slicing
-  const totalPages = Math.ceil(filteredAndSortedDocuments.length / ITEMS_PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filteredAndSortedDocuments.length / ITEMS_PER_PAGE));
   const paginatedDocuments = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return filteredAndSortedDocuments.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -172,12 +160,24 @@ export default function MyDocumentsPage() {
             </p>
           </div>
 
-          <Button asChild className="gap-2 shadow-xs font-semibold shrink-0">
-            <Link href="/upload">
-              <UploadCloud className="h-4 w-4" />
-              <span>Upload Document</span>
-            </Link>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={fetchDocuments}
+              disabled={isLoading}
+              className="gap-1.5"
+            >
+              <RefreshCw className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+              <span>Refresh</span>
+            </Button>
+            <Button asChild className="gap-2 shadow-xs font-semibold shrink-0">
+              <Link href="/upload">
+                <UploadCloud className="h-4 w-4" />
+                <span>Upload Document</span>
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Filter & Search Controls */}
@@ -200,7 +200,12 @@ export default function MyDocumentsPage() {
         />
 
         {/* Main Content: Table or Empty State */}
-        {filteredAndSortedDocuments.length === 0 ? (
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center p-12 space-y-4">
+            <RefreshCw className="h-8 w-8 text-primary animate-spin" />
+            <p className="text-sm text-muted-foreground">Loading documents repository...</p>
+          </div>
+        ) : filteredAndSortedDocuments.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/80 bg-card p-12 text-center space-y-4">
             <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <FileSpreadsheet className="h-7 w-7" />

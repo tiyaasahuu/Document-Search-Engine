@@ -1,7 +1,7 @@
 import os
 import logging
 from typing import List, Dict, Any
-import pymupdf as fitz
+import pymupdf
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -12,7 +12,6 @@ from app.services.chunking_service import ChunkingService
 from app.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
-
 
 
 class PDFExtractionError(Exception):
@@ -33,15 +32,15 @@ class PDFExtractorService:
     @classmethod
     def extract_page_data(cls, file_path: str) -> List[Dict[str, Any]]:
         """
-        Extracts text, width, height, page_number (1-indexed), and extraction_method ("pymupdf", "ocr", or "ocr_failed")
-        for each page of a PDF using PyMuPDF and OCR fallback when text is insufficient.
+        Extracts text, width, height, page_number (1-indexed), extraction_method ("pymupdf", "ocr", or "ocr_failed"),
+        and blocks_data (with bounding box coordinates [x0, y0, x1, y1]) for each page of a PDF.
         """
         if not os.path.exists(file_path):
             raise PDFExtractionError(f"PDF file does not exist at path: {file_path}")
 
         extracted_pages = []
         try:
-            doc = fitz.open(file_path)
+            doc = pymupdf.open(file_path)
         except Exception as e:
             logger.error(f"Failed to open PDF file {file_path}: {e}")
             raise PDFExtractionError(f"Invalid or corrupted PDF file: {e}")
@@ -61,6 +60,17 @@ class PDFExtractorService:
                 rect = page.rect
                 pymupdf_text = page.get_text() or ""
 
+                blocks_data: List[Dict[str, Any]] = []
+                raw_blocks = page.get_text("blocks")
+                for b in raw_blocks:
+                    if len(b) >= 7 and b[6] == 0:  # text block
+                        b_text = b[4].strip() if b[4] else ""
+                        if b_text:
+                            blocks_data.append({
+                                "text": b_text,
+                                "bbox": [round(float(b[0]), 2), round(float(b[1]), 2), round(float(b[2]), 2), round(float(b[3]), 2)]
+                            })
+
                 if cls.is_text_sufficient(pymupdf_text):
                     final_text = pymupdf_text
                     method = "pymupdf"
@@ -68,12 +78,17 @@ class PDFExtractorService:
                     logger.info(
                         f"Page {page_index + 1} has insufficient text ({len(pymupdf_text.strip())} chars < {settings.OCR_MIN_TEXT_CHARS}). Triggering OCR fallback."
                     )
-                    ocr_text, ocr_method = OCRService.extract_text_from_page(page)
+                    ocr_res = OCRService.extract_text_from_page(page, return_blocks=True)
+                    ocr_text = ocr_res[0] if len(ocr_res) > 0 else None
+                    ocr_method = ocr_res[1] if len(ocr_res) > 1 else "ocr_failed"
+                    ocr_blocks = ocr_res[2] if len(ocr_res) > 2 else []
+
                     if ocr_method == "ocr" and ocr_text is not None:
                         final_text = ocr_text
                         method = "ocr"
+                        if ocr_blocks:
+                            blocks_data = ocr_blocks
                     else:
-                        # OCR failed or unavailable: log error and track extraction_method as "ocr_failed"
                         logger.warning(
                             f"OCR fallback failed/unavailable for page {page_index + 1}. Retaining PyMuPDF text with method 'ocr_failed'."
                         )
@@ -87,6 +102,7 @@ class PDFExtractorService:
                         "width": float(rect.width),
                         "height": float(rect.height),
                         "extraction_method": method,
+                        "blocks_data": blocks_data,
                     }
                 )
             doc.close()
@@ -100,12 +116,35 @@ class PDFExtractorService:
             raise PDFExtractionError(f"Failed to extract text from PDF: {e}")
 
     @classmethod
+    def extract_outline(cls, file_path: str) -> List[Dict[str, Any]]:
+        """
+        Extracts Table of Contents / bookmarks hierarchy from PDF using PyMuPDF doc.get_toc().
+        """
+        if not os.path.exists(file_path):
+            return []
+        try:
+            doc = pymupdf.open(file_path)
+            toc = doc.get_toc()
+            doc.close()
+            return [
+                {
+                    "level": int(item[0]),
+                    "title": str(item[1]),
+                    "page_number": int(item[2]),
+                }
+                for item in toc
+                if len(item) >= 3 and item[2] > 0
+            ]
+        except Exception as e:
+            logger.error(f"Failed to extract TOC from {file_path}: {e}")
+            return []
+
+    @classmethod
     def process_document_extraction(cls, db: Session, document: Document) -> bool:
         """
         Executes document text extraction and manages status transitions:
         Uploaded -> Processing -> Processed / Failed
         """
-        # Step 1: Transition status to Processing
         try:
             document.status = "Processing"
             db.commit()
@@ -118,11 +157,9 @@ class PDFExtractorService:
         if not os.path.isabs(file_path):
             file_path = os.path.abspath(file_path)
 
-        # Step 2: Extract text & store pages in PostgreSQL
         try:
             pages_data = cls.extract_page_data(file_path)
 
-            # Clear existing pages if re-processing
             db.query(DocumentPage).filter(DocumentPage.document_id == document.id).delete()
 
             page_objects = [
@@ -133,6 +170,7 @@ class PDFExtractorService:
                     width=page["width"],
                     height=page["height"],
                     extraction_method=page["extraction_method"],
+                    blocks_data=page["blocks_data"],
                 )
                 for page in pages_data
             ]
@@ -143,11 +181,9 @@ class PDFExtractorService:
             db.refresh(document)
             logger.info(f"Successfully extracted {len(page_objects)} pages for document {document.id}.")
 
-            # Step 3: Trigger text chunking service
             chunks = ChunkingService.process_document_chunking(db, document.id)
             logger.info(f"Successfully chunked document {document.id} into {len(chunks)} text chunks.")
 
-            # Step 4: Trigger embedding generation service
             chunks = EmbeddingService.process_chunks_embeddings(db, chunks)
             logger.info(f"Successfully generated embeddings for {len(chunks)} chunks of document {document.id}.")
 

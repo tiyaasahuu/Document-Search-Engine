@@ -109,6 +109,15 @@ class ChunkingService:
                     chunk_overlap=chunk_overlap,
                 )
                 for chunk_text in page_text_chunks:
+                    chunk_bboxes = []
+                    if page.blocks_data:
+                        for block in page.blocks_data:
+                            b_text = block.get("text", "")
+                            if b_text and (b_text in chunk_text or chunk_text in b_text or any(w in b_text for w in chunk_text.split() if len(w) > 3)):
+                                bbox = block.get("bbox")
+                                if bbox and bbox not in chunk_bboxes:
+                                    chunk_bboxes.append(bbox)
+
                     chunk_obj = DocumentChunk(
                         id=uuid.uuid4(),
                         document_id=document_id,
@@ -116,6 +125,7 @@ class ChunkingService:
                         page_number=page.page_number,
                         chunk_index=global_chunk_index,
                         text=chunk_text,
+                        bboxes=chunk_bboxes if chunk_bboxes else None,
                     )
                     chunk_objects.append(chunk_obj)
                     global_chunk_index += 1

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { ConversationList, ConversationThread } from "@/components/chat/ConversationList";
 import { ChatHeader } from "@/components/chat/ChatHeader";
@@ -11,243 +11,322 @@ import { MessageInput } from "@/components/chat/MessageInput";
 import { CitationPanel, CitationItem } from "@/components/chat/CitationCard";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { MessageSquareText, Plus } from "lucide-react";
+import { MessageSquareText, Plus, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-// Initial Realistic Dummy Threads
-const INITIAL_CONVERSATIONS: ConversationThread[] = [
-  {
-    id: "thread-1",
-    title: "Research Paper Analysis",
-    lastMessage: "The paper introduces a hybrid retrieval method that improves answer accuracy...",
-    time: "2m ago",
-    documentName: "Research_Paper.pdf",
-  },
-  {
-    id: "thread-2",
-    title: "Machine Learning Notes",
-    lastMessage: "Explain the difference between dense embeddings and sparse BM25 indices.",
-    time: "1h ago",
-    documentName: "ML_Handbook.pdf",
-  },
-  {
-    id: "thread-3",
-    title: "Contract Review",
-    lastMessage: "Are there any indemnification clauses in section 4.2?",
-    time: "3h ago",
-    documentName: "Service_Contract.pdf",
-  },
-  {
-    id: "thread-4",
-    title: "Medical Report",
-    lastMessage: "Summarize patient diagnosis and key lab findings.",
-    time: "1d ago",
-    documentName: "Medical_Report_Q3.pdf",
-  },
-];
-
-// Initial Messages Map
-const INITIAL_MESSAGES_MAP: Record<string, MessageItem[]> = {
-  "thread-1": [
-    {
-      id: "m-1",
-      sender: "user",
-      content: "What is the main contribution of this paper?",
-      time: "10:14 AM",
-    },
-    {
-      id: "m-2",
-      sender: "ai",
-      content:
-        "The paper introduces a novel hybrid retrieval architecture combining dense vector embeddings with sparse BM25 reranking.\n\nKey highlights include:\n• 18% improvement in prediction precision over baseline transformers\n• Sub-second response latency (1.2s average)\n• Verified source attribution with exact bounding box citations.",
-      time: "10:14 AM",
-      citations: [
-        { page: 12, snippet: "This proposed retrieval method improves answer accuracy by combining dense vector search with reranking." },
-        { page: 14, snippet: "Experimental benchmarks demonstrate an 18% gain in precision on noisy technical documents." },
-      ],
-    },
-  ],
-  "thread-2": [
-    {
-      id: "m-3",
-      sender: "user",
-      content: "Explain the difference between dense embeddings and sparse BM25 indices.",
-      time: "9:00 AM",
-    },
-    {
-      id: "m-4",
-      sender: "ai",
-      content:
-        "Dense embeddings capture semantic meaning using continuous vector representations (e.g. OpenAI ada-002), while sparse BM25 uses term frequency and keyword matching.\n\nCombining both yields optimal recall for domain-specific terminology.",
-      time: "9:01 AM",
-      citations: [
-        { page: 4, snippet: "Sparse BM25 excels at exact keyword matching, whereas dense vectors capture semantic context." },
-      ],
-    },
-  ],
-};
-
-// Initial Citations Map
-const INITIAL_CITATIONS_MAP: Record<string, CitationItem[]> = {
-  "thread-1": [
-    {
-      id: "cit-1",
-      documentName: "Research_Paper.pdf",
-      pageNumber: 12,
-      snippet: "This proposed retrieval method improves answer accuracy by combining dense vector search with reranking.",
-      confidence: 98,
-    },
-    {
-      id: "cit-2",
-      documentName: "Research_Paper.pdf",
-      pageNumber: 14,
-      snippet: "Experimental benchmarks demonstrate an 18% gain in precision on noisy technical documents.",
-      confidence: 94,
-    },
-  ],
-  "thread-2": [
-    {
-      id: "cit-3",
-      documentName: "ML_Handbook.pdf",
-      pageNumber: 4,
-      snippet: "Sparse BM25 excels at exact keyword matching, whereas dense vectors capture semantic context.",
-      confidence: 96,
-    },
-  ],
-};
+import { chatService } from "@/services/chatService";
+import { documentService } from "@/services/documentService";
+import { ConversationResponse, DocumentResponse, MessageResponse, RAGSourceItem } from "@/types";
 
 export default function ChatPage() {
-  const [conversations, setConversations] = useState<ConversationThread[]>(INITIAL_CONVERSATIONS);
-  const [activeThreadId, setActiveThreadId] = useState<string>("thread-1");
-  const [messagesMap, setMessagesMap] = useState<Record<string, MessageItem[]>>(INITIAL_MESSAGES_MAP);
-  const [citationsMap, setCitationsMap] = useState<Record<string, CitationItem[]>>(INITIAL_CITATIONS_MAP);
+  const [conversations, setConversations] = useState<ConversationResponse[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [activeMessages, setActiveMessages] = useState<MessageItem[]>([]);
+  const [activeCitations, setActiveCitations] = useState<CitationItem[]>([]);
 
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [documents, setDocuments] = useState<DocumentResponse[]>([]);
+  const [selectedDocId, setSelectedDocId] = useState<string>("all");
+
+  const [isLoadingList, setIsLoadingList] = useState<boolean>(true);
+  const [isLoadingDetail, setIsLoadingDetail] = useState<boolean>(false);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const [citationsOpen, setCitationsOpen] = useState(true);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const activeThread = conversations.find((c) => c.id === activeThreadId);
-  const activeMessages = messagesMap[activeThreadId] || [];
-  const activeCitations = citationsMap[activeThreadId] || [];
+  // Helper to format timestamps
+  const formatTime = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return "Just now";
+    }
+  };
+
+  const getDocName = useCallback(
+    (docId: string) => {
+      const found = documents.find((d) => d.id === docId);
+      return found ? found.original_filename : docId;
+    },
+    [documents]
+  );
+
+  // Map RAGSourceItem array to CitationItem array
+  const mapSourcesToCitations = useCallback(
+    (sources: RAGSourceItem[]): CitationItem[] => {
+      return (sources || []).map((src, idx) => ({
+        id: `cit-${src.document_id}-${src.chunk_index}-${idx}`,
+        documentId: src.document_id,
+        documentName: src.original_filename || getDocName(src.document_id),
+        pageNumber: src.page_number,
+        snippet: src.text,
+        confidence: Math.round((src.similarity_score || 0) * 100),
+        pageWidth: src.page_width,
+        pageHeight: src.page_height,
+        bboxes: src.bboxes,
+      }));
+    },
+    [getDocName]
+  );
+
+  // Load document list for document filter dropdown
+  useEffect(() => {
+    async function loadDocs() {
+      try {
+        const docs = await documentService.getDocuments();
+        setDocuments(docs);
+      } catch (err) {
+        console.error("Failed to load documents for chat filter:", err);
+      }
+    }
+    loadDocs();
+  }, []);
+
+  // Fetch user conversations from backend on mount
+  const refreshConversations = useCallback(async (autoSelectId?: string) => {
+    try {
+      setIsLoadingList(true);
+      const list = await chatService.getConversations();
+      setConversations(list);
+
+      if (autoSelectId) {
+        setActiveThreadId(autoSelectId);
+      } else if (list.length > 0 && !activeThreadId) {
+        setActiveThreadId(list[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to fetch conversations:", err);
+      toast.error("Could not load conversation history");
+    } finally {
+      setIsLoadingList(false);
+    }
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    refreshConversations();
+  }, [refreshConversations]);
+
+
+  // Fetch active conversation detail whenever activeThreadId changes
+  useEffect(() => {
+    if (!activeThreadId) {
+      setActiveMessages([]);
+      setActiveCitations([]);
+      return;
+    }
+
+    async function loadDetail() {
+      try {
+        setIsLoadingDetail(true);
+        const detail = await chatService.getConversationDetail(activeThreadId!);
+
+        // Map backend messages to frontend MessageItem
+        const mappedMsgs: MessageItem[] = detail.messages.map((m: MessageResponse) => ({
+          id: m.id,
+          sender: m.role === "user" ? "user" : "ai",
+          content: m.content,
+          time: formatTime(m.created_at),
+          citations: m.sources ? m.sources.map((s) => ({ page: s.page_number, snippet: s.text })) : undefined,
+        }));
+
+        setActiveMessages(mappedMsgs);
+
+        // Find latest assistant message with sources to populate citation panel
+        const assistantMsgsWithSources = detail.messages.filter(
+          (m) => m.role === "assistant" && m.sources && m.sources.length > 0
+        );
+        if (assistantMsgsWithSources.length > 0) {
+          const latestSources = assistantMsgsWithSources[assistantMsgsWithSources.length - 1].sources || [];
+          setActiveCitations(mapSourcesToCitations(latestSources));
+        } else {
+          setActiveCitations([]);
+        }
+      } catch (err) {
+        console.error("Failed to load conversation detail:", err);
+        toast.error("Failed to load message history");
+      } finally {
+        setIsLoadingDetail(false);
+      }
+    }
+
+    loadDetail();
+  }, [activeThreadId, mapSourcesToCitations]);
 
   // Auto-scroll message container to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messagesMap, activeThreadId, isGenerating]);
+  }, [activeMessages, activeThreadId, isGenerating]);
 
   // Handle New Chat
-  const handleNewChat = () => {
-    const newId = `thread-${Date.now()}`;
-    const newThread: ConversationThread = {
-      id: newId,
-      title: "New Research Session",
-      lastMessage: "Session initialized...",
-      time: "Just now",
-      documentName: "Research_Paper.pdf",
-    };
+  const handleNewChat = async () => {
+    try {
+      const docFilter = selectedDocId !== "all" ? selectedDocId : undefined;
+      const newConv = await chatService.createConversation("New Research Session", docFilter);
 
-    setConversations((prev) => [newThread, ...prev]);
-    setActiveThreadId(newId);
-    setMessagesMap((prev) => ({ ...prev, [newId]: [] }));
-    setCitationsMap((prev) => ({ ...prev, [newId]: [] }));
-    setMobileHistoryOpen(false);
-    toast.success("Created new research chat session");
+      setConversations((prev) => [newConv, ...prev]);
+      setActiveThreadId(newConv.id);
+      setActiveMessages([
+        {
+          id: `welcome-${newConv.id}`,
+          sender: "ai",
+          content: "Started new research chat session. Ask a question to generate a grounded RAG answer.",
+          time: "Just now",
+        },
+      ]);
+      setActiveCitations([]);
+      setMobileHistoryOpen(false);
+      toast.success("Created new research chat session");
+    } catch (err) {
+      console.error("Failed to create new chat:", err);
+      toast.error("Failed to create new conversation");
+    }
   };
 
   // Handle Delete Chat
-  const handleDeleteChat = (id: string) => {
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-    if (activeThreadId === id) {
+  const handleDeleteChat = async (id: string) => {
+    try {
+      await chatService.deleteConversation(id);
       const remaining = conversations.filter((c) => c.id !== id);
-      if (remaining.length > 0) setActiveThreadId(remaining[0].id);
+      setConversations(remaining);
+
+      if (activeThreadId === id) {
+        setActiveThreadId(remaining.length > 0 ? remaining[0].id : null);
+      }
+      toast.success("Chat session deleted");
+    } catch (err) {
+      console.error("Failed to delete conversation:", err);
+      toast.error("Failed to delete chat session");
     }
-    toast.success("Chat session deleted");
   };
 
-  // Handle Send Message
-  const handleSendMessage = (text: string) => {
+  // Handle Send Message with SSE Real-time Streaming
+  const handleSendMessage = async (text: string) => {
     if (!text.trim() || isGenerating) return;
 
     const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const userMsgId = `user-temp-${Date.now()}`;
+    const aiMsgId = `ai-stream-${Date.now()}`;
+
     const userMsg: MessageItem = {
-      id: `msg-${Date.now()}`,
+      id: userMsgId,
       sender: "user",
-      content: text,
+      content: text.trim(),
       time: timeStr,
     };
 
-    // Update messages & last message snippet
-    setMessagesMap((prev) => ({
+    // Append user message and empty placeholder AI message immediately
+    setActiveMessages((prev) => [
       ...prev,
-      [activeThreadId]: [...(prev[activeThreadId] || []), userMsg],
-    }));
-
-    setConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeThreadId
-          ? { ...c, lastMessage: text, time: "Just now" }
-          : c
-      )
-    );
+      userMsg,
+      {
+        id: aiMsgId,
+        sender: "ai",
+        content: "",
+        time: timeStr,
+      },
+    ]);
 
     setIsGenerating(true);
 
-    // Simulated AI response generation sequence
-    setTimeout(() => {
-      const aiMsg: MessageItem = {
-        id: `msg-ai-${Date.now()}`,
-        sender: "ai",
-        content: `Based on **${activeThread?.documentName || "Research_Paper.pdf"}**, here is the synthesized answer:\n\n1. **Core Insight**: The query highlights key methodologies in vector retrieval and contextual augmentation.\n2. **Accuracy Metric**: Grounded at **98% confidence** across primary citations.\n\nWould you like me to elaborate on specific statistical parameters or generate an executive summary?`,
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        citations: [
-          { page: 12, snippet: "The proposed retrieval method improves answer accuracy by combining dense vector search with reranking." },
-        ],
-      };
+    let currentConvId = activeThreadId;
+    let accumulatedContent = "";
 
-      const newCitation: CitationItem = {
-        id: `cit-${Date.now()}`,
-        documentName: activeThread?.documentName || "Research_Paper.pdf",
-        pageNumber: 12,
-        snippet: "The proposed retrieval method improves answer accuracy by combining dense vector search with reranking.",
-        confidence: 98,
-      };
+    const docFilter = selectedDocId !== "all" ? selectedDocId : undefined;
 
-      setMessagesMap((prev) => ({
-        ...prev,
-        [activeThreadId]: [...(prev[activeThreadId] || []), aiMsg],
-      }));
+    await chatService.streamChatMessage(
+      {
+        message: text.trim(),
+        conversation_id: currentConvId || undefined,
+        document_id: docFilter,
+        limit: 5,
+      },
+      {
+        onConversation: (convData) => {
+          currentConvId = convData.conversation_id;
+          setActiveThreadId(convData.conversation_id);
+          refreshConversations(convData.conversation_id);
+        },
+        onSources: (sources) => {
+          const citations = mapSourcesToCitations(sources);
+          setActiveCitations(citations);
 
-      setCitationsMap((prev) => ({
-        ...prev,
-        [activeThreadId]: [newCitation, ...(prev[activeThreadId] || [])],
-      }));
+          setActiveMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMsgId
+                ? { ...msg, citations: citations.map((c) => ({ page: c.pageNumber, snippet: c.snippet })) }
+                : msg
+            )
+          );
+        },
+        onToken: (token) => {
+          accumulatedContent += token;
+          setActiveMessages((prev) =>
+            prev.map((msg) => (msg.id === aiMsgId ? { ...msg, content: accumulatedContent } : msg))
+          );
+        },
+        onDone: () => {
+          setIsGenerating(false);
+          refreshConversations(currentConvId || undefined);
+        },
+        onError: (errDetail) => {
+          setIsGenerating(false);
+          toast.error("RAG Stream Error", { description: errDetail });
 
-      setIsGenerating(false);
-    }, 1500);
+          setActiveMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === aiMsgId
+                ? {
+                    ...msg,
+                    content: msg.content || `⚠️ **Error**: ${errDetail}`,
+                  }
+                : msg
+            )
+          );
+        },
+      }
+    );
   };
+
+  // Convert backend ConversationResponse list to ConversationThread format for list component
+  const conversationThreads: ConversationThread[] = conversations.map((c) => ({
+    id: c.id,
+    title: c.title,
+    lastMessage: c.last_message || "No messages yet",
+    time: formatTime(c.updated_at),
+    documentName: c.document_id ? getDocName(c.document_id) : "All Documents",
+  }));
+
+  const activeThread = conversations.find((c) => c.id === activeThreadId);
 
   return (
     <AppLayout>
       <div className="flex h-[calc(100vh-6.5rem)] rounded-2xl border border-border/80 bg-card overflow-hidden shadow-xl">
         {/* LEFT COLUMN: Desktop Conversation History Sidebar (300px) */}
         <div className="hidden md:block w-[300px] shrink-0 h-full">
-          <ConversationList
-            conversations={conversations}
-            activeId={activeThreadId}
-            onSelectConversation={setActiveThreadId}
-            onNewChat={handleNewChat}
-            onDeleteConversation={handleDeleteChat}
-          />
+          {isLoadingList ? (
+            <div className="flex flex-col items-center justify-center h-full p-4 text-muted-foreground text-xs gap-2">
+              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              <span>Loading conversations...</span>
+            </div>
+          ) : (
+            <ConversationList
+              conversations={conversationThreads}
+              activeId={activeThreadId || ""}
+              onSelectConversation={setActiveThreadId}
+              onNewChat={handleNewChat}
+              onDeleteConversation={handleDeleteChat}
+            />
+          )}
         </div>
 
         {/* Mobile History Drawer Sheet */}
         <Sheet open={mobileHistoryOpen} onOpenChange={setMobileHistoryOpen}>
           <SheetContent side="left" className="p-0 w-80 border-r border-border">
             <ConversationList
-              conversations={conversations}
-              activeId={activeThreadId}
+              conversations={conversationThreads}
+              activeId={activeThreadId || ""}
               onSelectConversation={(id) => {
                 setActiveThreadId(id);
                 setMobileHistoryOpen(false);
@@ -260,9 +339,12 @@ export default function ChatPage() {
 
         {/* CENTER COLUMN: Main Chat Workspace */}
         <div className="flex-1 flex flex-col min-w-0 h-full bg-background/50">
-          {/* Header */}
+          {/* Header with Document Filter Dropdown */}
           <ChatHeader
-            currentDocument={activeThread?.documentName || "Research_Paper.pdf"}
+            currentDocument={activeThread ? getDocName(activeThread.document_id || "all") : "All Documents"}
+            documents={documents}
+            selectedDocId={selectedDocId}
+            onSelectDocId={setSelectedDocId}
             onToggleMobileHistory={() => setMobileHistoryOpen(true)}
             onToggleCitations={() => setCitationsOpen((prev) => !prev)}
             isCitationsOpen={citationsOpen}
@@ -270,7 +352,12 @@ export default function ChatPage() {
 
           {/* Conversation Stream or Empty State */}
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-            {conversations.length === 0 ? (
+            {isLoadingDetail ? (
+              <div className="flex flex-col items-center justify-center h-full space-y-2 text-muted-foreground text-xs">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                <span>Loading messages...</span>
+              </div>
+            ) : conversations.length === 0 && activeMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8 space-y-4">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                   <MessageSquareText className="h-8 w-8" />
@@ -278,7 +365,7 @@ export default function ChatPage() {
                 <div className="space-y-1 max-w-sm">
                   <h3 className="text-lg font-bold">Start chatting with your uploaded documents.</h3>
                   <p className="text-xs text-muted-foreground">
-                    Select a research paper to ask questions and extract instant citations.
+                    Ask any question to retrieve vector context and stream Gemini answers in real-time.
                   </p>
                 </div>
                 <Button onClick={handleNewChat} className="gap-2 font-semibold shadow-xs">
@@ -296,7 +383,9 @@ export default function ChatPage() {
                   />
                 ))}
 
-                {isGenerating && <TypingIndicator />}
+                {isGenerating && activeMessages.length > 0 && !activeMessages[activeMessages.length - 1].content && (
+                  <TypingIndicator />
+                )}
                 <div ref={messagesEndRef} />
               </>
             )}

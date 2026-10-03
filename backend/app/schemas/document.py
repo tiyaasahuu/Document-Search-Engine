@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
@@ -19,5 +20,7 @@ class DocumentResponse(BaseModel):
     upload_time: datetime
     status: str
     file_path: str
+    total_pages: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+

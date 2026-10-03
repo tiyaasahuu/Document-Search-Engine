@@ -27,6 +27,19 @@ class Settings(BaseSettings):
     CHUNK_SIZE: int = 500
     CHUNK_OVERLAP: int = 50
 
+    # Gemini & RAG Settings
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    RAG_MAX_RETRIEVAL_LIMIT: int = 20
+    CHAT_MAX_HISTORY_TURNS: int = 6
+
+
+    # JWT Authentication Settings
+    SECRET_KEY: str = "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+
+
 
 
     model_config = SettingsConfigDict(

@@ -66,9 +66,17 @@ def test_multipage_chunking_db_relationships_and_ordering():
     """Test multi-page document chunking preserving document_id, page_id, page_number and chunk order."""
     db = SessionLocal()
     try:
+        from app.models.user import User
+        user = db.query(User).first()
+        if not user:
+            user = User(id=uuid.uuid4(), email=f"chunk_{uuid.uuid4().hex[:8]}@example.com", hashed_password="pass", full_name="Chunk User")
+            db.add(user)
+            db.commit()
+
         doc_id = uuid.uuid4()
         document = Document(
             id=doc_id,
+            user_id=user.id,
             filename=f"{doc_id}.pdf",
             original_filename="multi_page_test.pdf",
             file_size=1024,
@@ -153,9 +161,17 @@ def test_chunking_idempotency():
     """Test re-processing chunking on the same document clears previous chunks and does not duplicate."""
     db = SessionLocal()
     try:
+        from app.models.user import User
+        user = db.query(User).first()
+        if not user:
+            user = User(id=uuid.uuid4(), email=f"chunk2_{uuid.uuid4().hex[:8]}@example.com", hashed_password="pass", full_name="Chunk User 2")
+            db.add(user)
+            db.commit()
+
         doc_id = uuid.uuid4()
         document = Document(
             id=doc_id,
+            user_id=user.id,
             filename=f"{doc_id}.pdf",
             original_filename="idempotency_test.pdf",
             file_size=1024,
@@ -229,7 +245,14 @@ def test_end_to_end_upload_extraction_and_chunking():
         file_obj = BytesIO(pdf_bytes)
         upload_file = UploadFile(filename="e2e_chunking_doc.pdf", file=file_obj)
 
-        uploaded_doc = DocumentService.save_uploaded_document(db, upload_file)
+        from app.models.user import User
+        user = db.query(User).first()
+        if not user:
+            user = User(id=uuid.uuid4(), email=f"chunk3_{uuid.uuid4().hex[:8]}@example.com", hashed_password="pass", full_name="Chunk User 3")
+            db.add(user)
+            db.commit()
+
+        uploaded_doc = DocumentService.save_uploaded_document(db, upload_file, user)
         assert uploaded_doc is not None
         assert uploaded_doc.status == "Processed"
 

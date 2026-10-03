@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { BookOpen, FileText, ExternalLink, CheckCircle2, Layers } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,10 +9,14 @@ import { toast } from "sonner";
 
 export interface CitationItem {
   id: string;
+  documentId?: string;
   documentName: string;
   pageNumber: number;
   snippet: string;
   confidence: number;
+  pageWidth?: number;
+  pageHeight?: number;
+  bboxes?: number[][];
 }
 
 interface CitationCardProps {
@@ -20,6 +25,19 @@ interface CitationCardProps {
 }
 
 export function CitationCard({ citation, onViewPDF }: CitationCardProps) {
+  const queryParams = new URLSearchParams();
+  if (citation.documentId) queryParams.set("document_id", citation.documentId);
+  queryParams.set("page", citation.pageNumber.toString());
+  if (citation.pageWidth) queryParams.set("page_width", citation.pageWidth.toString());
+  if (citation.pageHeight) queryParams.set("page_height", citation.pageHeight.toString());
+  if (citation.bboxes && citation.bboxes.length > 0) {
+    queryParams.set("bboxes", JSON.stringify(citation.bboxes));
+  }
+  if (citation.snippet) {
+    queryParams.set("highlight", citation.snippet.slice(0, 100));
+  }
+  const viewerHref = `/viewer?${queryParams.toString()}`;
+
   return (
     <div className="rounded-xl border border-border/80 bg-card p-3.5 space-y-2.5 shadow-xs hover:border-primary/50 transition-all group">
       <div className="flex items-center justify-between">
@@ -52,11 +70,14 @@ export function CitationCard({ citation, onViewPDF }: CitationCardProps) {
       <Button
         variant="ghost"
         size="sm"
+        asChild
         onClick={() => onViewPDF?.(citation)}
         className="w-full h-7 text-xs gap-1.5 font-medium text-primary hover:bg-primary/10"
       >
-        <span>View in PDF</span>
-        <ExternalLink className="h-3 w-3" />
+        <Link href={viewerHref}>
+          <span>View in PDF</span>
+          <ExternalLink className="h-3 w-3" />
+        </Link>
       </Button>
     </div>
   );

@@ -17,7 +17,7 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
@@ -30,12 +30,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeToggle } from "./ThemeToggle";
 import { siteConfig } from "@/config/site";
+import { useAuth } from "@/providers/auth-provider";
 
 interface NavbarProps {
   onMobileMenuOpen?: () => void;
 }
 
 export function Navbar({ onMobileMenuOpen }: NavbarProps) {
+  const { user, logout } = useAuth();
+  const displayName = user?.full_name || user?.email || "User";
+  const initials = displayName.substring(0, 2).toUpperCase();
+
   return (
     <header className="sticky top-0 z-40 flex h-16 w-full items-center justify-between border-b border-border/60 bg-background/85 px-4 backdrop-blur-md transition-all sm:px-6">
       {/* Left: Mobile Toggle + Logo & Project Name */}
@@ -153,9 +158,8 @@ export function Navbar({ onMobileMenuOpen }: NavbarProps) {
               className="relative h-9 w-9 rounded-full p-0 ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               <Avatar className="h-9 w-9 border border-border">
-                <AvatarImage src="/avatar-placeholder.png" alt="Senior Engineer" />
                 <AvatarFallback className="bg-primary/10 text-primary font-semibold text-xs">
-                  SE
+                  {initials}
                 </AvatarFallback>
               </Avatar>
             </Button>
@@ -163,9 +167,9 @@ export function Navbar({ onMobileMenuOpen }: NavbarProps) {
           <DropdownMenuContent className="w-56" align="end" forceMount>
             <DropdownMenuLabel className="font-normal">
               <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Senior Engineer</p>
+                <p className="text-sm font-medium leading-none">{displayName}</p>
                 <p className="text-xs leading-none text-muted-foreground">
-                  engineer@documind.ai
+                  {user?.email || ""}
                 </p>
               </div>
             </DropdownMenuLabel>
@@ -185,7 +189,10 @@ export function Navbar({ onMobileMenuOpen }: NavbarProps) {
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onClick={logout}
+              className="cursor-pointer text-destructive focus:text-destructive"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>
@@ -195,3 +202,4 @@ export function Navbar({ onMobileMenuOpen }: NavbarProps) {
     </header>
   );
 }
+

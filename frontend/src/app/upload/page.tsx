@@ -1,64 +1,51 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Dropzone } from "@/components/upload/Dropzone";
 import { UploadProgress, UploadStage } from "@/components/upload/UploadProgress";
 import { DocumentTable, DocumentItem } from "@/components/upload/DocumentTable";
+import { documentService } from "@/services/documentService";
+import { DocumentResponse } from "@/types";
 import { toast } from "sonner";
-import { Sparkles } from "lucide-react";
+import { Sparkles, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
-const INITIAL_DOCUMENTS: DocumentItem[] = [
-  {
-    id: "doc-1",
-    name: "Research_Paper_2026.pdf",
-    type: "pdf",
-    uploadDate: "Aug 05, 2026",
-    status: "Indexed",
-    pages: 24,
-    size: "4.2 MB",
-  },
-  {
-    id: "doc-2",
-    name: "Executive_Summary_Q3.docx",
-    type: "docx",
-    uploadDate: "Aug 04, 2026",
-    status: "Indexed",
-    pages: 12,
-    size: "1.8 MB",
-  },
-  {
-    id: "doc-3",
-    name: "Legal_Contract_Draft.pdf",
-    type: "pdf",
-    uploadDate: "Aug 03, 2026",
-    status: "Processing",
-    pages: 48,
-    size: "8.6 MB",
-  },
-  {
-    id: "doc-4",
-    name: "System_Architecture.txt",
-    type: "txt",
-    uploadDate: "Aug 02, 2026",
-    status: "Uploaded",
-    pages: 5,
-    size: "0.4 MB",
-  },
-  {
-    id: "doc-5",
-    name: "Corrupted_File_Test.pdf",
-    type: "pdf",
-    uploadDate: "Jul 29, 2026",
-    status: "Failed",
-    pages: 0,
-    size: "0.1 MB",
-  },
-];
+function mapResponseToItem(doc: DocumentResponse): DocumentItem {
+  const extension = doc.original_filename.split(".").pop()?.toLowerCase() || "pdf";
+  const sizeMB = (doc.file_size / (1024 * 1024)).toFixed(1);
+  const formattedDate = doc.upload_time
+    ? new Date(doc.upload_time).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      })
+    : "Recently";
+
+  let statusVal: DocumentItem["status"] = "Processing";
+  if (doc.status === "Indexed" || doc.status === "Processed") {
+    statusVal = "Indexed";
+  } else if (doc.status === "Failed") {
+    statusVal = "Failed";
+  } else if (doc.status === "Uploaded") {
+    statusVal = "Uploaded";
+  }
+
+  return {
+    id: doc.id,
+    name: doc.original_filename,
+    type: extension,
+    uploadDate: formattedDate,
+    status: statusVal,
+    pages: 1,
+    size: `${sizeMB} MB`,
+  };
+}
 
 export default function UploadPage() {
-  const [documents, setDocuments] = useState<DocumentItem[]>(INITIAL_DOCUMENTS);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeUpload, setActiveUpload] = useState<{
     fileName: string;
     fileSizeMB: string;
@@ -67,62 +54,66 @@ export default function UploadPage() {
     file: File;
   } | null>(null);
 
-  // Simulated upload sequence
-  const handleFileSelect = (file: File) => {
+  const fetchDocuments = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await documentService.getDocuments();
+      setDocuments(data.map(mapResponseToItem));
+    } catch (err: unknown) {
+      console.error("Failed to fetch documents:", err);
+      const errMsg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Could not connect to backend server.";
+      toast.error("Failed to load documents", {
+        description: errMsg,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  // Actual backend upload sequence
+  const handleFileSelect = async (file: File) => {
     const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
 
     setActiveUpload({
       fileName: file.name,
       fileSizeMB,
-      progress: 10,
+      progress: 25,
       stage: "uploading",
       file,
     });
 
-    // Step 1: Uploading progress
-    setTimeout(() => {
-      setActiveUpload((prev) =>
-        prev ? { ...prev, progress: 45, stage: "uploading" } : null
-      );
-    }, 600);
+    try {
+      setActiveUpload((prev) => (prev ? { ...prev, progress: 60, stage: "indexing" } : null));
 
-    // Step 2: Transition to Vector Indexing
-    setTimeout(() => {
-      setActiveUpload((prev) =>
-        prev ? { ...prev, progress: 80, stage: "indexing" } : null
-      );
-    }, 1400);
+      await documentService.uploadDocument(file);
 
-    // Step 3: Completed & add to list
-    setTimeout(() => {
-      setActiveUpload((prev) =>
-        prev ? { ...prev, progress: 100, stage: "completed" } : null
-      );
+      setActiveUpload((prev) => (prev ? { ...prev, progress: 100, stage: "completed" } : null));
 
-      const extension = file.name.split(".").pop()?.toLowerCase() || "pdf";
-      const newDoc: DocumentItem = {
-        id: `doc-${Date.now()}`,
-        name: file.name,
-        type: extension,
-        uploadDate: "Just now",
-        status: "Indexed",
-        pages: Math.floor(Math.random() * 30) + 1,
-        size: `${fileSizeMB} MB`,
-      };
-
-      setDocuments((prev) => [newDoc, ...prev]);
       toast.success("Upload Successful", {
-        description: `"${file.name}" has been processed and indexed into vector memory.`,
+        description: `"${file.name}" uploaded successfully and indexed.`,
       });
 
-      // Clear progress bar after 2 seconds
+      // Refresh documents list from backend
+      await fetchDocuments();
+
       setTimeout(() => {
         setActiveUpload(null);
-      }, 2500);
-    }, 2200);
+      }, 2000);
+    } catch (err: unknown) {
+      console.error("Upload error:", err);
+      const errMsg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || "Upload failed. Please try again.";
+      toast.error("Upload Failed", {
+        description: errMsg,
+      });
+
+      setActiveUpload(null);
+    }
   };
 
-  // Action: Rename
   const handleRename = (id: string, newName: string) => {
     setDocuments((prev) =>
       prev.map((doc) => (doc.id === id ? { ...doc, name: newName } : doc))
@@ -132,7 +123,6 @@ export default function UploadPage() {
     });
   };
 
-  // Action: Delete
   const handleDelete = (id: string) => {
     const docToDelete = documents.find((doc) => doc.id === id);
     setDocuments((prev) => prev.filter((doc) => doc.id !== id));
@@ -189,9 +179,21 @@ export default function UploadPage() {
               </p>
             </div>
 
-            <Badge variant="secondary" className="text-xs font-semibold">
-              {documents.length} Total Documents
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchDocuments}
+                disabled={isLoading}
+                className="gap-1.5 text-xs"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+                <span>Refresh</span>
+              </Button>
+              <Badge variant="secondary" className="text-xs font-semibold">
+                {documents.length} Total Documents
+              </Badge>
+            </div>
           </div>
 
           <DocumentTable
